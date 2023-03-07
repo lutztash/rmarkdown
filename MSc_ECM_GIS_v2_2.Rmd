@@ -1,0 +1,1106 @@
+---
+title: "ECM 2022-2023 Research Module"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# **Introduction to GIS and Geostatistics in R**
+
+Using the packages *raster*, *grDevices, ggplot2, tidyverse, mapview, sf, units, rgeos,* and *rgdal*.
+
+## **Overview**
+
+This R script uses data collected in study plots in Ghana and water deficit data collected by Terra Climate (Abatzoglou et al., 2018) to illustrate various concepts and methods of GIS in R.
+
+In this practical we will:
+
+-   Import and visualise vector and raster data types on an interactive map
+
+-   Undertake spatial analysis with vector data to create shapefiles, calculate areas and intersecting points and polygons.
+
+-   Change the spatial resolution of raster data
+
+-   Reclassify rasters
+
+-   Crop, mask, buffer and extract with vector and raster data
+
+-   Export data to excel, and
+
+-   Undertake basic statistical analysis (linear regression)
+
+## **Terminology**
+
+**Shapefile:** a spatial vector file that stores the geometry for polygons, point, line spatial data. You might notice that in the folder where the data is saved, there are a number of sub-files that make up a shapefile. There are three mandatory files:
+
+-   `.shp` **--** contains the shape geometry
+
+-   `.shx` -- a shape index
+
+-   `.dbf` -- attribute format.
+
+Other important files include:
+
+-   `.prj` -- the description of the projection system
+
+-   `.sbn` -- a spatial index of the features
+
+-   `.cpg` -- specifies the code page, for identifying the character coding
+
+**Vector data**: spatial data that is used to represent points, lines and polygons.
+
+**Raster data**: spatial data in the form of an image file that divides a region into cells, or pixels. Each pixel value represents an area of the Earth's surface.
+
+**Raster Stack:** A file that contains more than one raster layer stacked on top of each other.
+
+**\#**: Lines that commence with hash-tags (\#) are comments. This means the line won't run as code, but they can be useful for annotating the code.
+
+**%\>%** : This symbol "%\>%" is called a 'pipe' and it is used to concatenate actions you can to carry out in the script instead of starting a new line.
+
+For example without the '%\>%', the code would need to be:
+
+`a <- raster('my_raster.img')`
+
+`a <- aggregated(a, factor=2)`
+
+but with the pipe it is:
+
+`a <- raster('my_raster.img') %>% aggregate( factor =2)`
+
+**Working directory:** This is the folder where all the data is located. Any data or tables created in the script will be saved here. 
+
+**Plot**: Used here to refer to either a graph/image (e.g. plot the figure) or to specify the place where 'vegetation was sampled.'
+
+## **1. Download data and set the working directory**
+
+Download the data file(s) [Data.zip] and R script [MSc_ECM_GIS_v2.R] from Canvas, and save them into a folder you have created on your computer - it's better practice than working out of your downloads folder.
+
+Ensure that all the individual data files and the R-script are saved into the same folder. Set this folder where all the data and the R script is stored together as your **working directory**.
+
+```{r eval=FALSE, include=FALSE}
+setwd('/Users/jesus/Documents/Teaching_2023/4_MyPresentations/Datasets')
+```
+
+#### How to set the working directory:
+
+There are many ways to set the working directory.
+
+1.  One method is to navigate in RStudio to **Session** \> **Set Working Directory** \> **Choose Directory** \> select the folder where you saved the data and R script. The `setwd` call and file path will appear in the Console (bottom left box on R Studio), e.g.
+
+    `setwd("Users/GeoffreyBiscuit/Documents/ResearchSkills/GIS")`
+
+    While the working directory has now been set for this session, to make the next run of this code file easier, you can copy this line of code from the console (without the \> at the start) and paste it into the top of your script. Re-running this line of code in the script next time will set the working directory without you having to manually set it again.
+
+2.  A second method is to go to the **Files** tab in the Files and Plots window (usually the bottom right box in R Studio). Navigate to the folder that you wish to use, and click the check box. Click on the **More** or **Settings** drop down and then **Set as Working Directory.**
+
+    If at any point, you would like to check where the working directory is, use the following code:
+
+    `getwd()`
+
+    and the file path will appear in the console.
+
+## **2. Loading the Packages and libraries**
+
+The first step is to load the packages. These need to be installed first if you have never used them before. To install, go to the **Tools \> Install Packages** or use the `install.packages` function. Refer to the package installation instructions document on Canvas for further guidance and troubleshooting.
+
+The following code loads the libraries that are used in this exercise to work with spatial data.
+
+```{r load the libraries}
+library(raster)	  # Enables the reading, writing and modelling of spatial data}
+library(grDevices)  # Supports base and grid graphics
+library(tidyverse)	# Includes packages such as ggplot2, dplyr, purrr
+library(mapview)	# Enables interactive viewing of spatial data
+library(sf) 		# Simple features in R – encodes spatial vector data
+library(units) 	# Enables measurement of vectors, matrices and calculations
+library(rgeos) # Implements functionality for the manipulation of spatial geometries
+library (rgdal) #Provides bindings to the Geospatial Data Abstraction Library (GDAL)
+library(ggplot2)	# Creates graphics
+
+```
+
+## 3. **Importing and visualising the vector data**
+
+### **(a) Ghana study region**
+
+The first shapefile (denoted in the script by the `.shp` suffix) shows the region of interest, in this case the country of Ghana. The following line of code reads in the `GHA.adm0.shp` data and assigns it an object name of 'ghana'.
+
+```{r}
+# (a) Load the region of interest data
+ghana <- read_sf("GHA_adm0.shp")
+```
+
+To check that this has been successful, you can look at the details of this data file which appear in the **Environment** tab of the objects pane.
+
+We can inspect the attributes of this data file through code. The following are several methods of doing this.
+
+```{r}
+ghana  
+```
+
+The `head()` function is used to view the first '*n*' rows of the data. You can also specify the number of rows you would like to view with the code `head(ghana, n=2)`
+
+```{r}
+head(ghana)
+```
+
+The following method uses an array to call the first 5 columns and the first 10 rows (not including the headings and ID).
+
+```{r}
+ghana[1:10, 1:5]
+```
+
+You might notice a lot of NAs on the attribute table for the shapefile `ghana`. Try see what happens when you change it to the following:
+
+```{r}
+ghana[1:1, 1:5]
+```
+
+We will then use the `mapview()` function to create an interactive visualization of the spatial data.
+
+```{r}
+mapview(ghana,color='blue',alpha.regions = 0,lwd=3)
+```
+
+### (b) **Vegetation/soil sampling Plots**
+
+The following batch of five shapefiles are polygons of study sites within the Bobiri Forest Reserve in Ghana. Vegetation in the region is moist-semi-deciduous tropical rainforest. Within these plots, vegetation diversity, trait and soil sampling occurs, as well as GPS and drone data collection. You can read more about the Bobiri Nature Reserve here: <http://gem.tropicalforests.ox.ac.uk/sites/bobiri>
+
+The `read_sf` function allows you to read shapefiles into R.
+
+```{r}
+
+bob1 <- read_sf("BOB01_plotMartinSvatek_fieldworkJan2022.shp") 
+bob2 <- read_sf("BOBnoGEM_isBOB3andY18stephen_plotMartinSvatek_fieldworkJan2022.shp")
+bob3 <- read_sf("BOBnoGEM_isBOB4andY10stephen_plotMartinSvatek_fieldworkJan2022.shp")
+bob4 <- read_sf("BOBnoGEM_isBOB5andPP1stephen_plotMartinSvatek_fieldworkJan2022.shp")
+bob5 <- read_sf("BOBnoGEM_isBOB6andPP2stephen_plotMartinSvatek_fieldworkJan2022.shp")
+```
+
+The polygons below do not have their names stored in the meta-data. Lets create it and store it now.
+
+```{r}
+bob1
+bob2
+bob3
+bob4
+bob5
+```
+
+The `mutate` function allows us to create, modify or delete columns. Here, we are using it to create a new column on this spatial object to give it a name.
+
+```{r}
+bob1 <- bob1 %>% mutate(Plot='BOB01')
+bob2 <- bob2 %>% mutate(Plot='BOB03')
+bob3 <- bob3 %>% mutate(Plot='BOB04')
+bob4 <- bob4 %>% mutate(Plot='BOB05')
+bob5 <- bob5 %>% mutate(Plot='BOB06')
+```
+
+The `rbind` function allows us to bind rows of data together into a single file. After running the below line of code, you can double-click on the object name `bob` in the Environment tab, to open the table of data we have created. You should be able to see the column headed Plot that we have just created.
+
+```{r}
+bob <- rbind(bob1,bob2,bob3,bob4,bob5)
+plot(bob[3])
+```
+
+We can now visualise the plots where the vegetation data has been collected.
+
+```{r}
+mapview(bob, zcol='Plot')
+```
+
+### **(c) Study Plots point data**
+
+This is a point dataset that marks one of the corners of each vegetation Plot.
+
+```{r}
+bob_p <- read_sf("BOB_points.shp")
+```
+
+```{r}
+bob_p # It seems there are many columns with no info!
+```
+
+```{r}
+bob_p<- bob_p %>% 
+  select(1,2,3,4,5,6,7,9) # Select only important columns
+bob_p
+```
+
+```{r}
+plot(bob_p[4], pch=20, cex=2)
+```
+
+To add them to the map:
+
+```{r}
+mapview(bob_p, zcol='Code')            # Here they are in space! 
+```
+
+### 
+
+### (d) **Bobiri Nature Reserve polygon**
+
+This data file is a polygon shapefile covering part of the 'BOBIRI' Nature Reserve in a moist semi-deciduous tropical rain forest. Read more about BOBIRI here: <http://gem.tropicalforests.ox.ac.uk/sites/bobiri>
+
+```{r}
+reserve<- read_sf('BOB_full_reserve.shp')
+```
+
+```{r}
+reserve
+```
+
+```{r warning=FALSE}
+mapview(reserve)
+```
+
+To visualise the Plots, points, and the Nature Reserve shapefiles together.
+
+```{r}
+mapview(reserve)+          
+  mapview(bob, zcol='Plot')+
+  mapview(bob_p, cex=3, zcol='Code')
+warning=FALSE
+```
+
+We can then include the name of the Nature Reserve in its meta-data and visualise the reserve.
+
+```{r}
+reserve$Name<-'Bobiri Nature Reserve'
+
+mapview(reserve, zcol='Name')+
+  mapview(bob, zcol='Plot')+
+  mapview(bob_p, zcol='Code')
+```
+
+## 4. **Importing and visualising the raster data**
+
+### **(a) Spectral reflectance information**
+
+The following **raster stack** is made up three layers (**.tif** files) overlaid on one another, with blue, green and red spectral reflectance bands.
+
+```{r}
+bob_raster <-stack('bob_raster1.tif')
+bob_raster_lowres_GCS <-stack('bob_raster_lowres_GCS.tif')# a lower spatial resolution version
+```
+
+We can then visualise the raster file.
+
+```{r echo=FALSE, message=TRUE, warning=FALSE}
+viewRGB(bob_raster_lowres_GCS, r = 3, g = 2, b = 1, maxpixels =  4e+05)
+```
+
+You may get a warning here saying the number of pixels in the raster is more than 4e+05 - you can change the number of max pixels in the code but it will take longer to show the image.
+
+### **(b) Maximum Climatic Water Deficit (MCWD) data**
+
+To explore any relationships between climate variables and surface reflectance, we can introduce some climate data. The next data import is a raster file (.tif) containing an index of water deficit, or drought conditions using the Terra Climate dataset (Abatzoglou et al., 2018).
+
+```{r}
+mcwd <- raster('MCWD_5817_TerraClimate.tif')
+names(mcwd)<-'MCWD'
+```
+
+Within this dataset, the values are initially negative, indicating a water deficit, but later in this code we will covert the values to be positive, so that the interpretation is easier.
+
+```{r}
+mapview(mcwd)
+```
+
+## 5. Working with vector data
+
+### (a) Create a shape file - points and polygons
+
+You can create shapefiles of points and polygon data. We will first create a random set of 100 points for sampling in the study area. If you had undertaken field work, and had coordinates from the data collection, you could import it directly without generating the `points_table` we use below.
+
+```{r}
+points_table <- bob_raster_lowres_GCS %>% #Get a raster file from the study area
+  mask(reserve)%>%            #Extract only the part of the raster that falls within the Nature Reserve
+  as.data.frame(xy=T)%>%      #Create a data frame from it
+  drop_na()%>%                #Delete NA values
+  sample_n(100)%>%            #Select a random 100 samples from there
+  select(1,2)                 #Only keep the coordinates
+```
+
+```{r}
+head(points_table)
+```
+
+```{r}
+points_sh    <- points_table %>% st_as_sf(coords = c('x', 'y')) #Create the points shapefile based on the coordinates from above
+```
+
+```{r}
+mapview()+
+  mapview(points_sh)
+```
+
+You have created a shapefile! We can also create a shapefile with a point as the centroid, and then create a buffer around this point.
+
+```{r}
+points_sh_b<- st_buffer(points_sh, 0.001)#buffer by ~100m
+mapview()+
+  mapview(points_sh_b)
+```
+
+You can also set the style to be square to reflect different study plot shapes.
+
+```{r}
+points_sh_bs<- st_buffer(points_sh, 0.001,endCapStyle="SQUARE")#buffer by ~100m but square this time
+mapview()+
+  mapview(points_sh_bs)
+```
+
+Displaying this all together:
+
+```{r}
+# Lets plot the points and polygons together
+mapview()+
+  mapview(points_sh,color='brown', cex=1,alpha.regions = 0)+
+  mapview(points_sh_b,color='red',alpha.regions = 0)+
+  mapview(points_sh_bs,color='blue',alpha.regions = 0)
+```
+
+Here, we will create a polygon using coordinate data as the corners.
+
+```{r}
+x_coord <- c(-1.36,-1.34, -1.33, -1.3485, -1.36)
+y_coord <- c(6.7,6.7058, 6.6860, 6.6847, 6.7)
+```
+
+```{r}
+xym <- cbind(x_coord, y_coord)
+xym <- Polygon(xym)
+xym <- Polygons(list(xym),1) # Here it is not yet an 'spatial' object, more like a matrix or table like 
+xym <- SpatialPolygons(list(xym))# Here you are converting it to an spatial object
+xym <- st_as_sf(xym)             # Here I am changing the format so it is compatible with the 'sf' library we are using
+
+```
+
+```{r}
+mapview()+
+  mapview(points_sh,color='brown', cex=1,alpha.regions = 0)+
+  mapview(points_sh_b,color='red',alpha.regions = 0)+
+  mapview(points_sh_bs,color='blue',alpha.regions = 0)+
+  mapview(xym,color='darkgreen',alpha.regions = 0, lwd=4)# This is the polygon you just created!
+
+```
+
+### (b) Calculating the area of a polygon
+
+Calculating the area of a shape or region in GIS is a very common exercise. Here, we will calculate the area covered by each vegetation plot and the Bobiri Nature Reserve.
+
+```{r}
+bob
+mapview(bob)
+
+bob                           #Check the names of the columns you have now
+names(bob)                    #You can also request the names of the columns like this
+bob$Plot_Area_m2<-st_area(bob)#The function 'st_area' will calculate the value for you for each Plot
+                              #The area value will be stored in a column called 'Plot_Area_m2'
+```
+
+The `summary()` function is used to obtain summary statistics of the attributes of the data.
+
+```{r}
+#What is the area occupied by each plot?
+bob
+bob$Plot_Area_m2
+summary(bob$Plot_Area_m2)
+```
+
+```{r}
+#Can we calculate the area also for the Bobiri Nature Reserve?
+reserve$Plot_Area_m2<-st_area(reserve)
+reserve$Plot_Area_m2
+
+```
+
+```{r}
+#How many hectares?
+reserve$Plot_Area_m2 * 0.0001
+```
+
+We can now visualize the Plot and Nature Reserve area you calculated, and make a barplot
+
+```{r}
+bob$Plot
+
+```
+
+```{r}
+bob$Plot_Area_m2
+```
+
+```{r message=FALSE, warning=FALSE}
+bob = bob %>%
+  mutate(Plot_Area_m2 = units::drop_units(Plot_Area_m2))
+```
+
+```{r}
+ggplot(bob, aes(Plot,Plot_Area_m2))+
+  geom_bar(aes(fill=Plot), col='black',stat="identity")+
+  geom_hline(yintercept = mean(bob$Plot_Area_m2), col='darkred',linewidth=2, lty=2)+
+  theme_classic()
+
+```
+
+```{r}
+#How many hectares have we sampled in our plots? --Divide the result by 10000 so you get from m2 to ha
+sum(bob$Plot_Area_m2)
+```
+
+```{r}
+barplot(as.numeric(reserve$Plot_Area_m2))
+```
+
+```{r}
+#How many hectares are in the Nature reserve?
+reserve$Plot_Area_m2
+```
+
+```{r}
+#What is the % sampled by Plots in the Nature Reserve
+(sum(bob$Plot_Area_m2)*100)/reserve$Plot_Area_m2 # This is X %
+```
+
+------------------------------------------------------------------------
+
+#### **Challenge**
+
+Can you include a column in the 'plots' and 'reserve' layers capturing the area but in hectares instead of m2?
+
+------------------------------------------------------------------------
+
+### (c) Calculating how many points fall within a given polygon
+
+It can be useful to know how many points (or here, plots) fall within the polygon we created in Step 5a. Here, we will extract only the points that intersect with the polygon, as it can be useful for further analysis.
+
+```{r}
+mapview(reserve[3], color='darkgreen', alpha.regions = 0, lwd=2)+
+  mapview(xym, color='black',alpha.regions = 0, lwd=2)+
+  mapview(points_sh)
+
+```
+
+```{r}
+intersection <- st_intersection(x = xym, y = points_sh)
+intersection #Check the data; what is in there in comparison to what you have in the reserve and bob_p datasets?
+
+```
+
+```{r}
+mapview(reserve[3], color='darkgreen', alpha.regions = 0, lwd=2)+
+  mapview(xym, color='black',alpha.regions = 0, lwd=2)+
+  mapview(intersection)
+
+```
+
+```{r}
+nrow(intersection) #Number of points in polygon
+```
+
+```{r}
+# To zoom in on the polygon
+mapview()+
+  mapview(xym, color='black',alpha.regions = 0, lwd=2)+
+  mapview(intersection)
+```
+
+## 6. Exploring vector meta-data and attributes
+
+```{r}
+# Using the map of the reserve created earlier:  
+mapview(reserve, zcol='Name')+
+  mapview(bob, zcol='Plot')+
+  mapview(bob_p, zcol='Code')
+```
+
+Things to explore:
+
+1.  Click in each one of the polygons and see their attributes - what name do they have?
+
+2.  What do you notice missing between the polygons and points?
+
+3.  What is the area of the plots (polygons) you have? are all the same size?
+
+The data can be explored in a table format. What type of dataset is `bob` (point, line, polygon, raster)? How many records/Plots (different sites) are represented in this file?
+
+```{r}
+bob
+```
+
+What type of dataset of `bob_p` ? (point, line, polygon, raster)? How many records/Plots (different sites) are represented in this file?
+
+```{r}
+bob_p  
+```
+
+What type of dataset of `reserve`? (point, line, polygon, raster)? How many records/Plots (different sites) are represented in this file?
+
+```{r}
+reserve 
+```
+
+Focusing in on one aspect, the coordinate reference system (CRS); do the three files have the same CRS?
+
+```{r}
+bob$geometry
+crs(bob)
+```
+
+```{r}
+bob_p$geometry
+crs(bob_p)
+```
+
+```{r}
+reserve$geometry
+crs(reserve)
+```
+
+```{r}
+#Look for the names of the plots and reserve you have in the shapefile
+unique(bob$Plot)
+unique(reserve$Name)
+is(reserve)
+```
+
+------------------------------------------------------------------------
+
+#### **Question**
+
+What do you think would happen if the three files did not have the same CRS?
+
+*Hint: would you be able to do spatial analysis with the three of them combined?*
+
+#### Coordinates - CRS
+
+See also: [https://www.nceas.ucsb.edu/sites/default/files/2020-4/OverviewCoordinateReferenceSystems.pdf](https://www.nceas.ucsb.edu/sites/default/files/2020-04/OverviewCoordinateReferenceSystems.pdf){.uri}
+
+#### **Challenge**
+
+Lets check the metadata of the 'points_sh_bs' (points created in Step 5 above)
+
+*Can you tell which is the CRS (coordinate reference system) the shapefile uses?*
+
+------------------------------------------------------------------------
+
+```{r}
+crs(points_sh_bs)   #Here we are asking what is the CRS, What is the answer you get?
+
+?CRS()              #Lets get help to understand how to include the CRS to the shapefile
+```
+
+```{r}
+st_crs(points_sh_bs)<-'+proj=longlat +datum=WGS84 +no_defs'    #This is the common WGS84 CRS (decimal degrees)
+#We are assigning it to this shapefile we created
+
+```
+
+```{r}
+#Now, lets ask again what is now the CRS; You have now updated the reference system of your layer!
+points_sh_bs        
+#Remember that this is a decimal degree CRS but you can also have others
+crs(points_sh_bs)   
+#Projected Coordinate Systems that use the distances in meters. For now we stick to Geographical ones (GCS).
+```
+
+## 7. Working with raster data
+
+We have been working a lot with shapefiles and vector data. We can now work with the raster data.
+
+```{r}
+ex<-extent(-1.4,-1.28,6.65,6.73)#limit the raster to a given extent because this one is heavy (high spatial resolution)
+
+```
+
+------------------------------------------------------------------------
+
+#### **Challenge**:
+
+Can you find out the spatial resolution (pixel size) and whether it is a geographic or projected coordinate system?
+
+*Hint - does it have a UTM zone, and if so, which one?*
+
+------------------------------------------------------------------------
+
+```{r}
+bob_raster
+```
+
+We can view the raster file:
+
+```{r}
+viewRGB(bob_raster, r = 3, g = 2, b = 1, maxpixels =  4e+05)
+```
+
+We can change the projection to be the one we have in the other shapefiles so that they are all comparable.
+
+```{r}
+bob_raster_gcs  <- bob_raster %>% projectRaster(crs='+proj=longlat +datum=WGS84 +no_defs')#Projection information
+                                                                                   
+bob_raster_gcs1  <- crop(bob_raster_gcs,ex)  #Now extract the raster part that overlays with the extent we set up
+bob_raster_gcs1  <- bob_raster_gcs1[[1:3]]#select the first three layers
+```
+
+Now, overlap the footprint of the new raster. We have now managed to crop a raster to a predetermined extent.
+
+```{r}
+plot(bob_raster_gcs[[1]])                     #Check the original raster
+plot(bob_raster_gcs1[[1]], add=T, col='green')#Now overlay the footprint of the new raster. 
+```
+
+#### (a) Changing the spatial resolution of your raster
+
+If you do not need a high spatial resolution, you can decrease its resolution. Here, we will decrease the resolution by a factor of 2, getting the average pixel value.
+
+```{r}
+bob_raster_gcs2      <- bob_raster_gcs1%>%aggregate(fact=2,fun=mean)
+```
+
+Compare the first one:
+
+```{r}
+bob_raster_gcs1
+```
+
+With the lower resolution one below - how much did it change?
+
+```{r}
+bob_raster_gcs2
+```
+
+If you needed to increase the resolution:
+
+```{r}
+bob_raster_gcs3 <-  bob_raster_gcs1%>%disaggregate(fact=2,fun=mean)#Do you notice any improvement? 
+```
+
+Compare the one below:
+
+```{r}
+bob_raster_gcs1 
+```
+
+With this lower resolution one, how much did it change?
+
+```{r}
+bob_raster_gcs2 
+```
+
+Compare with the one below...
+
+```{r}
+bob_raster_gcs3 
+```
+
+This process has changed the spatial resolution of a raster dataset!
+
+We can also explore the names of the raster data:
+
+```{r}
+bob_raster_gcs1
+```
+
+We can change the band names from 'layer.1, layer.2, layer.3' to the colour names 'blue', 'green', and 'red'.
+
+```{r}
+names(bob_raster_gcs1)<-c('blue','green','red')
+bob_raster_gcs1
+```
+
+```{r}
+#Visualize the Raster data
+viewRGB(bob_raster_gcs1, r = 3, g = 2, b = 1)
+
+```
+
+We can then put the vegetation Plots, their Points and the Nature Reserve on top of your raster. You can then click around the image to explore the points, plots, and reserve to check their details.
+
+```{r}
+viewRGB(bob_raster_gcs1, r = 3, g = 2, b = 1)+
+  mapview(reserve, color='darkred', alpha.regions = 0, lwd=2)+
+  mapview(bob, zcol='Plot')+
+  mapview(bob_p, zcol='Code')
+```
+
+#### (b) Reclassifying rasters
+
+There are a number of reasons to reclassify raster data. For example, you may want to remove outliers, or group together various types of vegetation data into classes to simplify information in the raster. Here, we will undertake a simple reclassification of some of the extreme values in the spectral raster layer of the Nature Reserve.
+
+```{r}
+#View your Raster image
+viewRGB(bob_raster_gcs1, r = 3, g = 2, b = 1)+
+  mapview(reserve, color = 'darkred', alpha.regions = 0, lwd=3)
+
+```
+
+```{r}
+summary(bob_raster_gcs1) #Lets explore its details
+```
+
+```{r}
+par(mfrow=c(1,1))               
+boxplot(bob_raster_gcs1) # It seems we have many outliers
+```
+
+To reclassify this image, first, remember that the raster has three bands (or layers), one on top of the other.
+
+```{r}
+bob_raster_gcs1 #See this in the row named 'names' OR:
+nlayers(bob_raster_gcs1)
+```
+
+If you have rasters with more than one layer or band, you need to reclassify each one separately by using the name of the raster, followed by the '[[]]' with the layer number inside as below. We will first reclassify the blue layer.
+
+```{r}
+summary(bob_raster_gcs1)#Lets use the values of the 3rd quartile as the maximum value in the Raster
+
+# The reclassification is basically setting the range, e.g. ----from      ,   to ,      becomes------
+#                               for the first layer this is: 122.51050   ,   255,     122.51050
+
+r1 <- bob_raster_gcs1[[1]] %>% reclassify (c(122.51050,260,122.51050))
+summary(r1)
+mapview(r1)
+```
+
+Second, the green spectral reflectance raster.
+
+```{r}
+r2 <- bob_raster_gcs1[[2]] %>% reclassify (c(156.09995,260,156.09995))
+summary(r2)
+mapview(r2)
+```
+
+Third, the red spectral reflectance raster.
+
+```{r}
+r3 <- bob_raster_gcs1[[3]] %>% reclassify (c(109.18733,260,109.18733))
+summary(r3)
+mapview(r3)
+```
+
+We can then stack the three bands together. When you reclassify a raster you create a new raster object that can be exported.
+
+```{r}
+r_123<- stack(r1, r2, r3) #The command 'stack' puts the three reclassified bands together again
+
+viewRGB(r_123, r = 3, g = 2, b = 1)+      #Visualize your reclassified Raster stack
+  mapview(reserve, color = 'darkred', alpha.regions = 0, lwd=3)
+```
+
+```{r}
+#Lets check the areas where the values where modified by calculating the difference between the original and the reclassified Raster stack
+r_dif <- (bob_raster_gcs1 - r_123) 
+plot(r_dif)                        #You can see that most of the difference was in the human modified areas such as small towns and road
+mapview(r_dif[[3]])+              #What does the changes mean? what does values above 0 mean?
+mapview(reserve, color = 'darkred', alpha.regions = 0, lwd=3)
+```
+
+## 7. Exploring raster meta-data and attributes
+
+```{r}
+#Lets look at one of your images from the reserve. What do you see in its details?
+viewRGB(bob_raster_gcs1, r = 3, g = 2, b = 1)
+
+#Lets check the metadata from the raster
+str(bob_raster_gcs1) #lots going on here, but do not worry check the next line
+bob_raster_gcs1      #Much simpler; What are you looking at? Lets go through the details
+
+bob_raster_gcs1 <- setMinMax(bob_raster_gcs1)# Lets ask to calculate the statistics of the raster
+bob_raster_gcs1$blue
+bob_raster_gcs1$green
+bob_raster_gcs1$red
+
+par(mfrow=c(3,1))
+plot(bob_raster_gcs1[[1]])
+hist(bob_raster_gcs1$blue, col='blue')
+hist(bob_raster_gcs1$red, add=T, col='red')
+hist(bob_raster_gcs1$green, add=T, col='green', alpha=.9)
+
+boxplot(bob_raster_gcs1)#Other way to visualize the data you we have in the raster
+```
+
+## 8. Buffer/ Clip / Crop/ Mask/ Extract polygon and rasters & create summary histograms
+
+### (a) Buffering a polygon
+
+The process of buffering a polygon, line or point generates a polygon feature with an outline at a specified distance around the initial polygon. In R, the `st_buffer` function encircles a geometry object at a specified distance.
+
+Lets get the plots and polygons and buffer them.
+
+```{r}
+#Here the polygon
+mapview(bob)
+
+pbuf_100  = st_buffer(bob, 100, endCapStyle = "SQUARE") #This value is how much you want to buffer and it is in the units of the polygon
+mapview(bob)+
+  mapview(pbuf_100, zcol='Plot')
+
+
+pbuf_1000 = st_buffer(bob, 1000, endCapStyle = "SQUARE")#Lets make it bigger
+mapview(bob)+
+  mapview(pbuf_100, zcol='Plot')+
+  mapview(pbuf_1000, alpha.regions = 0, lwd=2)        
+
+```
+
+------------------------------------------------------------------------
+
+#### Challenge:
+
+The polygons created above, with the buffer command still conserve the original attributes (table information) such as the original area, while this has changed. How would you update the area of the `'pbuf_100'` and `'pbuf_1000'` polygons?
+
+------------------------------------------------------------------------
+
+We will now include and visualise the raster of the Nature Reserve and the polygons created above.
+
+```{r}
+viewRGB(bob_raster_gcs1, r = 3, g = 2, b = 1)+
+  mapview(bob)+
+  mapview(pbuf_100, zcol='Plot')+
+  mapview(pbuf_1000, alpha.regions = 0, lwd=2) 
+
+```
+
+### (b) Cropping and masking raster data by polygons
+
+We can extract or mask raster data for the original Plots, the 100m buffers, and the 1000m buffers.
+
+We first need to check that we use the 'crop' command, and then the 'mask' one subsequently - *do you have an idea why?*
+
+```{r}
+#Here we use a file with all the Plots together (bob) but you can also use the single Plots (e.g. bob1 or bob2 etc).
+mask_to_polygons_all<-crop(bob_raster_gcs1,bob)%>%mask(bob)       #Mask the raster by the area it shares with the original plots
+mapview(mask_to_polygons_all)+mapview(bob, color = 'green', alpha.regions = 0, lwd=3)#View it as a map
+
+mask_to_polygons_all_100<-crop(bob_raster_gcs1,pbuf_100)%>%mask(pbuf_100)         #Mask the raster by the area it shares with the 100m buffer plots
+mapview(mask_to_polygons_all_100)+mapview(pbuf_100, color = 'green', alpha.regions = 0, lwd=3)#View it as a map
+
+mask_to_polygons_all_1000<-crop(bob_raster_gcs1,pbuf_1000)%>%mask(pbuf_1000)         #Mask the raster by the area it shares with the 1000m buffer plots
+mapview(mask_to_polygons_all_1000)+mapview(pbuf_1000, color = 'green', alpha.regions = 0, lwd=3)#View it as a map
+
+
+par(mfrow=c(3,1))                   # NOW PRINT ALL OF THEM IN THE SAME SCREEN
+plot(mask_to_polygons_all[[1]])     # What are you looking seeing there?
+plot(mask_to_polygons_all_100[[1]]) # What do you see about the raster values across the three polygon sizes?
+plot(mask_to_polygons_all_1000[[1]])
+```
+
+We can plot the images with a histogram of their values for the first band in the raster stack. What do you notice about the raster values across the three polygon sizes?
+
+```{r}
+par(mfrow=c(3,2))                   
+plot(mask_to_polygons_all[[1]])
+hist(mask_to_polygons_all[[1]])
+
+plot(mask_to_polygons_all_100[[1]]) 
+hist(mask_to_polygons_all_100[[1]])
+
+plot(mask_to_polygons_all_1000[[1]])
+hist(mask_to_polygons_all_1000[[1]])
+```
+
+We can crop the MCWD index of drought intensity to the Nature Reserve polygon, as it currently covers the whole tropics! As we have multiplied the data by -1, a larger MCWD value now indicates stronger water deficits.
+
+```{r}
+mcwd <- mcwd * -1
+mapview(mcwd)
+```
+
+```{r}
+mcwd_sa <- crop(mcwd, reserve)
+mapview(mcwd_sa)+
+  mapview(reserve)
+```
+
+We can also crop the MCWD raster using another raster (thus not only with a polygon!). We do not need to use the 'mask' command because the two rasters would need the same 'extent' to be able to use them with that function. Lets do this here:
+
+```{r}
+viewRGB(bob_raster_gcs1, r = 3, g = 2, b = 1)#Remember, this is your spectral raster from the study area
+```
+
+```{r}
+mcwd_sa_raster <- crop(mcwd, bob_raster_gcs1)#This is the cropped version ---What do you notice here? a bit of a mismatch? why?
+                                            #When at least the majority of the Raster cell is overlapped by the polygon it will be extracted
+
+```
+
+```{r}
+viewRGB(bob_raster_gcs1, r = 3, g = 2, b = 1)+
+  mapview(mcwd_sa_raster)+
+  mapview(reserve,  color = 'green', alpha.regions = 0, lwd=3)
+```
+
+### (c) Extracting values to points (or polygon) from other layers that overlap
+
+We can go back to our original data. Using the `head()` function, check the points shapefile, including the attributes.
+
+```{r}
+head(bob) 
+```
+
+What would you do if you wanted to extract the values of the spectral raster to this point table? We will first make the map with the raster, the polygons where vegetation data has been collected and the corner points.
+
+You can zoom into each plot and explore it again.
+
+```{r}
+viewRGB(bob_raster_gcs1, r = 3, g = 2, b = 1)+
+  mapview(bob, zcol='Plot')+   #This is the corner points
+  mapview(bob_p, zcol='Code')   #This is the vegetation plot, zoom to one and see how many pixels fit inside it
+
+```
+
+We can then extract the raster values to each polygon shapefile. As there are several 'pixels' of the raster in each polygon, we get the 'mean' value in the polygon, and save that value into the polygon (bob) table, using the `cbind` command.
+
+```{r}
+bob_wRastData <- raster::extract(bob_raster_gcs1, bob, fun='mean') %>% 
+  cbind(bob)                                                          
+
+```
+
+If we re-check the attribute table, what do you notice has happened?
+
+```{r}
+head(bob_wRastData)
+```
+
+We can then extract the raster values to each of the Points shapefile. As each point `(bob_p)` falls into one raster pixel, then that raster pixel is extracted to the points `(bob_p)` table using the `cbind` (column bind) command.
+
+```{r}
+bob_p_wRastData <- raster::extract(bob_raster_gcs1, bob_p) %>%       
+cbind(bob_p)                                                       
+```
+
+```{r}
+head(bob_p_wRastData) #Check the attribute table now, what do you see happened?
+```
+
+```{r}
+#Now view the datasets you created, hover around them and click on top of them to see their attributes
+viewRGB(bob_raster_gcs1, r = 3, g = 2, b = 1)+
+  mapview(bob_wRastData, zcol='Plot')+
+  mapview(bob_p_wRastData, zcol='Code')
+```
+
+We can also create a new layer and introduce the drought intensity data into the analysis by extracting the MCWD values at the points.
+
+```{r}
+mapview(mcwd_sa)+
+  mapview(bob_wRastData, zcol='Plot')+
+  mapview(bob_p_wRastData, zcol='Code')
+```
+
+```{r}
+# Extract the raster values to the points shapefile for which you extracted the spectral reflectance above
+extracted_MCWD  <- raster::extract(mcwd_sa, bob_p)%>%as.data.frame()%>% janitor::clean_names()%>%rename(MCWD=x)
+```
+
+```{r}
+bob_p_wRastData <- bob_p_wRastData %>% cbind(extracted_MCWD)
+```
+
+```{r}
+head(bob_p_wRastData) # This point attribute table has the MCWD values now!
+                      # Visualize it, hover around and click the points to see the attributes you extracted
+```
+
+```{r}
+mapview(mcwd_sa)+
+  mapview(reserve,zcol='Name', color = 'green', alpha.regions = 0, lwd=3)+
+  mapview(bob, zcol='Plot', color = 'orange', alpha.regions = 0, lwd=3)+
+  mapview(bob_p_wRastData, zcol='Code')
+```
+
+## 9. Geostatistics: converting a spatial object with all information to a table for further analysis (linear regression, other statistics)
+
+Once you have created spatial objects, you can convert them into a table, which is useful for conducting statistical analysis, such as comparing the relationship between several data sources through a linear regression.
+
+First, use the `head()`, `mapview` and `summary` functions to look at the data and determine what information is contained.
+
+```{r}
+head(bob_p_wRastData)# see some of the Points information you collected
+```
+
+```{r}
+
+mapview(bob_p_wRastData)#Click on top of them in the map and see the attributes
+summary(bob_p_wRastData)
+
+```
+
+We will then create a data frame with the `bob_p_wRastData` and call it `FinalTable`.
+
+```{r}
+#Convert the points shapefile to a normal table you can export to Excel for instance or do more stats here:
+FinalTable <- bob_p_wRastData %>% as.data.frame()
+head(FinalTable)#See, it is the same than above but this is not an spatial object anymore!
+View(FinalTable)#View the table in a tab, it will appear automatically
+
+
+
+```
+
+We can then graphically display different aspects of this data. Once we have set a 2x2 grid, we can plot a scatter plot of the red spectral information against elevation; and three box plots showing the distribution of the elevation, blue and red spectral bands.
+
+```{r}
+par(mfrow=c(2,2))
+plot(FinalTable$red, as.numeric(FinalTable$Elevation))# How would you interpret this first graph?
+boxplot(as.numeric(FinalTable$Elevation), main="Elevation (m)")# What are these graphs telling you?
+boxplot(FinalTable$blue, main="Blue band")
+boxplot(FinalTable$red, main="Red band")
+
+```
+
+### (a) Using the data in a linear model
+
+Here we will model the relationship between the spatial reflectance of the raster layers and the water availability (here measured as the maximum climate water deficit). The data for this step is the co-located spectral reflectance and MCWD values extracted in the previous section.
+
+```{r}
+m1 <- lm(red ~ MCWD, data= FinalTable)
+summary(m1)
+par(mfrow=c(1,1))
+plot(FinalTable$MCWD, FinalTable$red, )# How would you interpret this first graph?
+abline(m1, col='darkred')              # this is the slope of the model, a quite bad one though, but it works as an example
+
+```
+
+### (b) Exporting table to excel
+
+Once you have created the table, you can then export to excel. This excel file will be saved in the working directory you set up at the start of this script.
+
+```{r}
+write_csv(FinalTable, 'Final_Table_ECM.csv')#And if you want you can export your Table!
+
+```
+
+```{r}
+# If you do not remember where your working directory is, you can check it like this:
+getwd()
+```
+
+### **References and R Package Citations**
+
+*Note: you can easily find out how to cite R packages in your dissertations using the code `citation("package name")` in your script or console.*
+
+Abatzoglou, J.T., Dobrowski, S.Z., Parks, S.A., Hegewisch, K.C., 2018. TerraClimate, a high-resolution global dataset of monthly climate and climatic water balance from 1958--2015. Sci. Data 5, 170191. <https://doi.org/10.1038/sdata.2017.191>
+
+H. Wickham. ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York, 2016.
+
+Robert J. Hijmans & Jacob van Etten (2012). raster: Geographic analysis and modeling with raster data. R package version 2.0-12. <http://CRAN.R-project.org/package=raster>
+
+R Core Team (2021). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL <https://www.R-project.org/.>
+
+Pebesma, E., 2018. Simple Features for R: Standardized Support for Spatial Vector Data. The R Journal 10 (1), 439-446, <https://doi.org/10.32614/RJ-2018-009>
+
+Pebesma E, Mailund T, Hiebert J (2016). "Measurement Units in R." \_R Journal\_, \*8\*(2), 486-494. <doi:10.32614/RJ-2016-061> (URL: [https://doi.org/10.32614/RJ-2016-061).](https://doi.org/10.32614/RJ-2016-061).)
+
+Roger Bivand and Colin Rundel (2021). rgeos: Interface to Geometry Engine - Open Source ('GEOS'). R package version 0.5-9. <https://CRAN.R-project.org/package=rgeos>
+
+Roger Bivand, Tim Keitt and Barry Rowlingson (2021). rgdal: Bindings for the 'Geospatial' Data Abstraction Library. R package version 1.5-28. <https://CRAN.R-project.org/package=rgdal>
+
+Tim Appelhans, Florian Detsch, Christoph Reudenbach and Stefan Woellauer (2021). mapview: Interactive Viewing of Spatial Data in R. R package version 2.10.0. <https://CRAN.R-project.org/package=mapview>
+
+Wickham et al., (2019). Welcome to the tidyverse. Journal of Open Source Software, 4(43), 1686, <https://doi.org/10.21105/joss.01686>
